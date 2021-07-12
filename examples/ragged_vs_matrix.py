@@ -14,7 +14,7 @@ from warnings import warn
 import torch
 import matplotlib.pyplot as plt
 
-from nsgt import NSGT, NSGT_sliced, LogScale, LinScale, MelScale, OctScale, VQLogScale, BarkScale SndReader
+from nsgt import NSGT, NSGT_sliced, LogScale, LinScale, MelScale, OctScale, VQLogScale, BarkScale, SndReader
 
 
 def overlap_add_slicq(slicq, ncoefs):
@@ -206,7 +206,7 @@ else:
     for i, C_block in enumerate(c):
         freq_start = freq_idx
         freq_idx += C_block.shape[2]
-        print(f'\tblock {i}, f {freq_start}-{freq_idx}: {C_block.shape}')
+        print(f'\tblock {i}, f {freq_start}: {C_block.shape}')
 
 signal_recon = slicq.backward(c, signal.shape[-1])
 
