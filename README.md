@@ -5,20 +5,35 @@ PyTorch implementation of the Nonstationary Gabor Transform and sliCQ Transform,
 * Gino Angelo Velasco et al., "Constructing an invertible constant-Q transform with nonstationary Gabor frames." 2011. url: https://www.univie.ac.at/nonstatgab/pdf_files/dohogrve11_amsart.pdf.
 
 This fork adds the following features:
-* Bark scale (`BarkScale` based on this [Barktan formula](https://github.com/stephencwelch/Perceptual-Coding-In-Python/issues/3)
-* Variable-Q scale (`VQLogScale`) with a frequency offset parameter (`gamma`), based on:
+* Bark scale based on the [Barktan formula](https://github.com/stephencwelch/Perceptual-Coding-In-Python/issues/3)
+* Variable-Q scale with a frequency offset parameter based on:
     * Christian Schörkhuber et al. “A Matlab Toolbox for Efficient Perfect Reconstruction Time-Frequency Transforms with Log-Frequency Resolution.” In: Proceedings of the AES International Conference. 2014.
     * Dong-Yan Huang, Minghui Dong, and Haizhou Li. “A Real-Time Variable-Q Non-Stationary Gabor Transform for Pitch Shifting.” In: INTERSPEECH – 16th Annual Conference of the International Speech Communication Association. Sept. 2015.
 * Minimum slice length suggestion for a given frequency scale
-* [PyTorch](https://github.com/pytorch/pytorch/) tensor implementation for faster performance and the capability to use the NSGT in GPU deep learning models
-* Support for both the ragged and matrix forms - return shape description below. The ragged and matrix forms can be converted into one another with the functions `ragged.ragged_to_matrix` and `ragged.matrix_to_ragged`
-* Support for generating spectrogram plots for the ragged and matrix forms, embedded in the library (not in a separate example script)
+* [PyTorch](https://github.com/pytorch/pytorch/) tensor implementation for faster performance and the capability to use the NSGT or sliCQ in GPU deep learning models
+* Support for the ragged/jagged sliCQ transform
 
-## sliCQ transform return shapes
+The purpose of this fork is to support a [deep learning model for music source separation](https://github.com/sevagh/xumx-sliCQ).
 
-The NSGT allows for nonuniform time-frequency resolution. Following the example of the constant-Q transform, music can be analyzed by maintaining a constant-Q center frequency to frequency resolution ratio per bin, to have high frequency resolution at low frequencies and high time resolution at high frequencies.
+## STFT vs. sliCQ spectrogram
 
-In the diagram below, the NSGT/sliCQ transform output of an audio signal using a simple nonlinear frequency scale, `[10, 50, 400, 3000, 16000] Hz`, is demonstrated:
+The NSGT or sliCQ allow for nonuniform time-frequency resolution. Following the example of the constant-Q transform, music can be analyzed by maintaining a constant-Q center frequency to frequency resolution ratio per bin, to have high frequency resolution at low frequencies and high time resolution at high frequencies.
+
+The spectrograms below show the magnitude transform of an excerpt of music (10 seconds from [Mestis - El Mestizo](https://www.youtube.com/watch?v=0kn2doStfp4)):
+
+<img src="./.github/spectrograms.png" width=768px />
+
+The above was generated with the [examples/spectrogram.py](https://github.com/sevagh/nsgt/blob/torch/examples/spectrogram.py) script with a 48-bin log scale (i.e. CQT) from 83-22050 Hz:
+```
+(nsgt-torch) $ python examples/spectrogram.py \
+                ./mestis.wav --sr 44100 \
+                --scale=cqlog --fmin 83.0 --fmax 22050 --bins 48 --sllen=32768 --trlen=4096 \
+                --plot
+```
+
+## Tensor sliCQ transform
+
+In the diagram below, the NSGT/sliCQ transform output of an audio signal using a simple nonlinear frequency scale, `[10, 50, 400, 3000, 16000] Hz`, is demonstrated in a simplified diagram:
 
 <img src=".github/slicq_shape.png" width=768px/>
 
@@ -41,16 +56,11 @@ for i, C_block in enumerate(jagged_slicq_output):
     freq_idx += C_block.shape[2]
 ```
 
-Here's a sample output from the script `examples/ragged_vs_matrix.py`:
+Here's a sample output from the script [examples/ragged_vs_matrix.py](https://github.com/sevagh/nsgt/blob/torch/examples/ragged_vs_matrix.py):
 
 ```
-(nsgt-torch) sevagh:nsgt $ python examples/ragged_vs_matrix.py \
-            ./mix_short.wav \
-            --scale=cqlog \
-            --fmin 83.0 \
-            --fmax 22050 \
-            --sr 44100 \
-            --bins 12
+$ python examples/ragged_vs_matrix.py ./mestis.wav --sr 44100 \
+              --scale=cqlog --fmin 83.0 --fmax 22050 --bins 12
 NSGT-sliCQ jagged shape:
         block 0, f 0: torch.Size([2, 2, 1, 3948])
         block 1, f 1: torch.Size([2, 2, 1, 2024])
@@ -68,6 +78,28 @@ NSGT-sliCQ jagged shape:
         block 13, f 13: torch.Size([2, 2, 1, 16])
 recon error (mse): 6.658166853412695e-07
 ```
+
+Compare this to the matrix form:
+```
+$ python examples/ragged_vs_matrix.py ./mestis.wav --sr 44100 \
+              --scale=cqlog --fmin 83.0 --fmax 22050 --bins 12 \
+              --matrixform
+NSGT-sliCQ matrix shape: torch.Size([2, 2, 14, 537856])
+recon error (mse): 2.0801778646273306e-06
+```
+
+### Ragged vs. matrix
+
+Due to the complicated nature of the sliCQ transform, it's not very simple to describe how to swap between the ragged and matrix forms. There is a zero-padding step, but not just at the final step before the return.
+
+* In [nsgtf.py](https://github.com/sevagh/nsgt/blob/torch/nsgt/nsgtf.py#L69-L75), zeros are inserted in between the first and second halves of the lower time resolution coefficients to pad them to the size of the largest, followed by an ifft call
+* The `arrange` function in [slicq.py](https://github.com/sevagh/nsgt/blob/torch/nsgt/slicq.py#L40) swaps the beginning and ending portions of the transform according to the Blackman-Harris window step
+
+It's best to think of them separately, and it's important to note that in my experience, trying to use the matrix form in a neural network led to supbar results (most probably due to the murky effect of the zero-padding, or "smearing", of the low time resolutions into larger ones).
+
+## Performance
+
+
 
 ## License and attributions
 
