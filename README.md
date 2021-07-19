@@ -1,4 +1,4 @@
-# nsgt
+# NSGT and sliCQ transforms
 
 PyTorch implementation of the Nonstationary Gabor Transform and sliCQ Transform, forked from [the reference implementation](https://github.com/grrrr/nsgt):
 * Peter Balazs et al, "Theory, implementation and applications of nonstationary Gabor frames." In: Journal of computational and applied mathematics 236 (2011), pp. 1481–1496. doi: 10.1016/j.cam.2011.09.011. url: https://ltfat.github.io/notes/ltfatnote018.pdf.
@@ -22,6 +22,8 @@ The NSGT or sliCQ allow for nonuniform time-frequency resolution. Following the 
 The spectrograms below show the magnitude transform of an excerpt of music (10 seconds from [Mestis - El Mestizo](https://www.youtube.com/watch?v=0kn2doStfp4)):
 
 <img src="./.github/spectrograms.png" width=768px />
+
+By using a varying time-frequency resolution, transients and tonal sounds are distinguished more clearly. This is essentially the crux of the hypothesis that the sliCQ transform may be useful for music source separation.
 
 The above was generated with the [examples/spectrogram.py](https://github.com/sevagh/nsgt/blob/torch/examples/spectrogram.py) script with a 48-bin log scale (i.e. CQT) from 83-22050 Hz:
 ```
@@ -99,7 +101,30 @@ It's best to think of them separately, and it's important to note that in my exp
 
 ## Performance
 
+This is not an exhaustive benchmark, but a time measurement of the forward + backward sliCQ transform on various devices, compared to the original NSGT library.
 
+Matrix transforms:
+
+| Library | Transform params | Device | Execution time (s) |
+|---------|-----------|--------|--------------------|
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 9.832 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 7.096 |
+| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 4.953 |
+| NSGT PyTorch | real=True | GPU (3080 Ti) | 4.953 |
+
+Ragged transforms:
+| Library | Transform params | Device | Execution time (s) |
+|---------|-----------|--------|--------------------|
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 2.845 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 3.512 |
+| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 2.249 |
+| NSGT PyTorch | real=True | GPU (3080 Ti) | 2.249 |
+
+The transform execution time is measured as follows:
+* Using the Linux `time` command-line tool with the script [examples/benchmark.py](https://github.com/sevagh/nsgt/blob/torch/examples/benchmarks.py))
+* Transforming the full length song [Mestis - El Mestizo](https://www.youtube.com/watch?v=0kn2doStfp4)
+* The test computer runs Fedora 33 amd64 with an AMD Ryzen 3700x processor, 64GB DDR4 memory, and NVIDIA 3080 Ti
+* The following sliCQ parameters: `--scale=cqlog --bins=512 --fmin=83. --fmax=22050.`
 
 ## License and attributions
 

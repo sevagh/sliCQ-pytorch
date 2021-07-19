@@ -92,10 +92,10 @@ c = slicq.forward((signal,))
 # add a batch
 c = torch.unsqueeze(c, dim=0)
 
-# dB
-mls = 20.*torch.log10(torch.abs(overlap_add_slicq(c)))
-
 if args.plot:
+    # dB
+    mls = 20.*torch.log10(torch.abs(overlap_add_slicq(c)))
+
     plt.rcParams.update({'font.size': 14})
     fig, axs = plt.subplots(2)
 
