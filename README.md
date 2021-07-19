@@ -33,6 +33,10 @@ The above was generated with the [examples/spectrogram.py](https://github.com/se
                 --plot
 ```
 
+### Install and run
+
+The included Conda environment script, [conda-env.yml](./conda-env.yml), contains the appropriate version of PyTorch (as well as some other unneeded dependencies, since its copied from a larger project).
+
 ## Tensor sliCQ transform
 
 In the diagram below, the NSGT/sliCQ transform output of an audio signal using a simple nonlinear frequency scale, `[10, 50, 400, 3000, 16000] Hz`, is demonstrated in a simplified diagram:
@@ -97,7 +101,7 @@ Due to the complicated nature of the sliCQ transform, it's not very simple to de
 * In [nsgtf.py](https://github.com/sevagh/nsgt/blob/torch/nsgt/nsgtf.py#L69-L75), zeros are inserted in between the first and second halves of the lower time resolution coefficients to pad them to the size of the largest, followed by an ifft call
 * The `arrange` function in [slicq.py](https://github.com/sevagh/nsgt/blob/torch/nsgt/slicq.py#L40) swaps the beginning and ending portions of the transform according to the Blackman-Harris window step
 
-It's best to think of them separately, and it's important to note that in my experience, trying to use the matrix form in a neural network led to supbar results (most probably due to the murky effect of the zero-padding, or "smearing", of the low time resolutions into larger ones).
+It's best to think of them separately, and it's important to note that in my experience, trying to use the matrix form in a neural network led to subpar results (most probably due to the murky effect of the zero-padding, or "smearing", of the low time resolutions into larger ones).
 
 ## Performance
 
