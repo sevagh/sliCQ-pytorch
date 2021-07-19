@@ -101,30 +101,44 @@ It's best to think of them separately, and it's important to note that in my exp
 
 ## Performance
 
-This is not an exhaustive benchmark, but a time measurement of the forward + backward sliCQ transform on various devices, compared to the original NSGT library.
+This is not an exhaustive benchmark, but a time measurement of the forward + backward sliCQ transform on various devices, compared to the original NSGT library, **omitting** the cost of memory transfer the song from host to the GPU device.
 
 Matrix transforms:
 
 | Library | Transform params | Device | Execution time (s) |
 |---------|-----------|--------|--------------------|
-| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 9.832 |
-| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 7.096 |
-| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 4.953 |
-| NSGT PyTorch | real=True | GPU (3080 Ti) | 4.953 |
+| NSGT PyTorch | real=True | GPU (3080 Ti) | 0.38 |
+| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 3.05 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 4.87 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 7.13 |
+| NSGT PyTorch | real=True | GPU (2070 SUPER) | n/a (OOM on 8GB vram) |
 
 Ragged transforms:
 | Library | Transform params | Device | Execution time (s) |
 |---------|-----------|--------|--------------------|
-| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 2.845 |
-| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 3.512 |
-| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 2.249 |
-| NSGT PyTorch | real=True | GPU (3080 Ti) | 2.249 |
+| NSGT PyTorch | real=True | GPU (3080 Ti) | 0.60 |
+| NSGT PyTorch | real=True | GPU (2070 SUPER) | 0.64 |
+| NSGT PyTorch | real=True | CPU (Ryzen 3700x) | 1.14 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=False | CPU (Ryzen 3700x) | 2.08 |
+| Original with [numpy.fft](https://numpy.org/doc/stable/reference/routines.fft.html) backend | real=True, multithreading=True | CPU (Ryzen 3700x) | 2.37 |
 
-The transform execution time is measured as follows:
-* Using the Linux `time` command-line tool with the script [examples/benchmark.py](https://github.com/sevagh/nsgt/blob/torch/examples/benchmarks.py))
-* Transforming the full length song [Mestis - El Mestizo](https://www.youtube.com/watch?v=0kn2doStfp4)
-* The test computer runs Fedora 33 amd64 with an AMD Ryzen 3700x processor, 64GB DDR4 memory, and NVIDIA 3080 Ti
-* The following sliCQ parameters: `--scale=cqlog --bins=512 --fmin=83. --fmax=22050.`
+The transform execution time was measured with the [examples/benchmark.py](https://github.com/sevagh/nsgt/blob/torch/examples/benchmarks.py) script on the full length song [Mestis - El Mestizo](https://www.youtube.com/watch?v=0kn2doStfp4) with sliCQ parameters `--scale=bark --bins=512 --fmin=83. --fmax=22050.` My computer runs Fedora 33 (amd64) with an AMD Ryzen 3700x processor, 64GB DDR4 memory, and NVIDIA 3080 Ti and 2070 SUPER. The Bark scale was chosen as it results in a smaller transform than the constant-Q log scale.
+
+Benchmark invocation arguments:
+```
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --torch-device="cpu"
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --torch-device="cuda:0"
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --torch-device="cuda:1"
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --old
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --old --multithreading
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --old --matrixform
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --old --matrixform --multithreading
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --matrixform --torch-device="cpu"
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --matrixform --torch-device="cuda:0"
+--scale=bark --bins=512 --fmin=83.0 --fmax=22050.0 --sr=44100 ./mestis.wav  --matrixform --torch-device="cuda:1"
+```
+
+Note that the goal of the GPU implementation is not the absolute fastest computation time, but the ability to compute the forward and inverse NSGT and sliCQ transforms on-the-fly in a training loop for GPU machine or deep learning models.
 
 ## License and attributions
 

@@ -66,12 +66,6 @@ if args.old:
 
     # read slices from audio file and mix down signal, if necessary at all
     signal = ((np.mean(s, axis=0),) for s in signal)
-
-    # generator for forward transformation
-    c = slicq.forward(signal)
-
-    c_list = list(c)
-    slicq.backward(c_list)
 else:
     slicq = NSGT_sliced(scl, args.sllen, args.trlen, fs, 
                         real=True, 
@@ -86,6 +80,19 @@ else:
     signal[-1] = torch.nn.functional.pad(signal[-1], (0, pad), mode='constant', value=0)
     signal = torch.cat(signal, dim=-1)
 
+import time
+start = time.time()
+if args.old:
+    # generator for forward transformation
+    c = slicq.forward(signal)
+
+    c_list = list(c)
+    slicq.backward(c_list)
+else:
     # generator for forward transformation
     c = slicq.forward((signal,))
     slicq.backward(c, signal.shape[-1])
+
+tot = time.time() - start
+
+print(f'total time: {tot:.2f}s')
