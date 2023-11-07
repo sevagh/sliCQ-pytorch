@@ -17,7 +17,6 @@ from .util import hannwin
 import torch
 
 
-#@profile
 def slicequads(frec_sliced, hhop):
     slices = [[slice(hhop*((i+3-k*2)%4),hhop*((i+3-k*2)%4+1)) for i in range(4)] for k in range(2)]
     slices = cycle(slices)
@@ -31,7 +30,6 @@ def slicequads(frec_sliced, hhop):
     return ret2
 
 
-#@profile
 def unslicing(frec_sliced, sl_len, tr_area, dtype=float, usewindow=True, device="cpu"):
     #print("unslicing: {0}".format(frec_sliced.shape))
 

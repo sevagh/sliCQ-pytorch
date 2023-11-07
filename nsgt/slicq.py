@@ -95,7 +95,6 @@ def starzip(iterables):
     return [inner(itr, i) for i,itr in enumerate(tee(iterables, len(it)))]
 
 
-#@profile
 def chnmap_forward(gen, seq, device="cpu"):
     chns = starzip(seq) # returns a list of generators (one for each channel)
 
@@ -203,7 +202,6 @@ class NSGT_sliced(torch.nn.Module):
     def slice_coefs(self):
         return self.ncoefs
     
-    #@profile
     def forward(self, sig):
         'transform - s: iterable sequence of sequences' 
 
@@ -220,7 +218,6 @@ class NSGT_sliced(torch.nn.Module):
 
         return cseq
 
-    #@profile
     def backward(self, cseq, length):
         'inverse transform - c: iterable sequence of coefficients'
         cseq = self.channelize(cseq)

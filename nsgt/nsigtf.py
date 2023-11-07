@@ -51,9 +51,8 @@ import numpy as np
 import torch
 from itertools import chain
 from .fft import fftp, ifftp, irfftp
-    
 
-#@profile
+
 def nsigtf_sl(cseq, gd, wins, nn, Ls=None, real=False, reducedform=0, matrixform=False, measurefft=False, multithreading=False, device="cpu"):
     dtype = gd[0].dtype
 
@@ -87,10 +86,10 @@ def nsigtf_sl(cseq, gd, wins, nn, Ls=None, real=False, reducedform=0, matrixform
         assert type(cseq) == torch.Tensor
         cseq_shape = cseq.shape[:3]
         cseq_dtype = cseq.dtype
+        nfreqs = cseq_shape[2]
         fc = fft(cseq)
 
     fr = torch.zeros(*cseq_shape[:2], nn, dtype=cseq_dtype, device=torch.device(device))  # Allocate output
-    temp0 = torch.empty(*cseq_shape[:2], maxLg, dtype=fr.dtype, device=torch.device(device))  # pre-allocation
 
     fbins = cseq_shape[2]
 
@@ -104,50 +103,111 @@ def nsigtf_sl(cseq, gd, wins, nn, Ls=None, real=False, reducedform=0, matrixform
 
     # The overlap-add procedure including multiplication with the synthesis windows
     if matrixform:
-        for i,(wr1,wr2,Lg) in enumerate(loopparams[:fbins]):
-            t = fc[:, :, i]
+        temp0 = torch.empty(*cseq_shape[:2], maxLg, dtype=fr.dtype, device=torch.device(device))
+        mfbin_ptr = len(loopparams)
 
-            r = (Lg+1)//2
-            l = (Lg//2)
+        for i, (wr1, wr2, Lg) in enumerate(loopparams[:fbins]):
+            # Reset temp0 for each frequency bin
 
-            t1 = temp0[:, :, :r]
-            t2 = temp0[:, :, Lg-l:Lg]
+            freq_idx = i
+            rr = 1 if freq_idx == 0 or freq_idx == nfreqs - 1 else 2
+            if reducedform:
+                rr = 2 if 0 < freq_idx < nfreqs - 1 else 1
 
-            t1[:, :, :] = t[:, :, :r]
-            t2[:, :, :] = t[:, :, maxLg-l:maxLg]
+            for k in range(rr):
+                t = fc[:, :, freq_idx]
 
-            temp0[:, :, :Lg] *= gdiis[i, :Lg] 
-            temp0[:, :, :Lg] *= maxLg
+                if k == 1:
+                    # Skip the first and last bins in reduced form
+                    if reducedform and (freq_idx == 1 or freq_idx == nfreqs - 2):
+                        continue
 
-            fr[:, :, wr1] += t2
-            fr[:, :, wr2] += t1
-    else:
-        # frequencies are bucketed by same time resolution
-        fbin_ptr = 0
-        for i, fc in enumerate(cseq):
-            Lg_outer = fc.shape[-1]
+                    mfbin_ptr -= 1
+                    freq_idx = mfbin_ptr
 
-            nb_fbins = fc.shape[2]
-            for i,(wr1,wr2,Lg) in enumerate(loopparams[fbin_ptr:fbin_ptr+nb_fbins][:fbins]):
-                freq_idx = fbin_ptr+i
+                    t = torch.concatenate(
+                        (
+                            t[:, :, :1],
+                            torch.flip(t[:, :, 1:], dims=(2,))
+                        ),
+                        dim=2,
+                    ).conj()
 
-                assert Lg == Lg_outer
-                t = fc[:, :, i]
+                    # need new params corresponding to adjusted freq_idx
+                    wr1, wr2, Lg = loopparams[freq_idx]
 
-                r = (Lg+1)//2
-                l = (Lg//2)
+                r = (Lg + 1) // 2
+                l = Lg // 2
 
                 t1 = temp0[:, :, :r]
-                t2 = temp0[:, :, Lg-l:Lg]
+                t2 = temp0[:, :, Lg - l : Lg]
 
                 t1[:, :, :] = t[:, :, :r]
-                t2[:, :, :] = t[:, :, Lg-l:Lg]
+                t2[:, :, :] = t[:, :, maxLg-l:maxLg]
 
-                temp0[:, :, :Lg] *= gdiis[freq_idx, :Lg] 
-                temp0[:, :, :Lg] *= Lg
+                temp0[:, :, :Lg] *= gdiis[freq_idx, :Lg]
+                temp0[:, :, :Lg] *= maxLg
 
                 fr[:, :, wr1] += t2
                 fr[:, :, wr2] += t1
+    else:
+        # frequencies are bucketed by same time resolution
+        fbin_ptr = 0
+        mfbin_ptr = len(loopparams)
+
+        for i, fc in enumerate(cseq):
+            nb_fbins = fc.shape[2]
+
+            temp0 = torch.empty(*cseq_shape[:2], maxLg, dtype=fr.dtype, device=torch.device(device))
+
+            for j, (wr1, wr2, Lg) in enumerate(loopparams[fbin_ptr : fbin_ptr + nb_fbins][:fbins]):
+                freq_idx = fbin_ptr + j
+
+                rr = 1 if freq_idx == 0 or freq_idx == nfreqs - 1 else 2
+                # Adjust rr calculation based on reducedform
+                if reducedform:
+                    rr = 2 if 0 < freq_idx < nfreqs - 1 else 1
+                else:
+                    rr = 1 if freq_idx == 0 or freq_idx == nfreqs - 1 else 2
+
+                for k in range(rr):
+                    # the overlap-add procedure including multiplication with the synthesis windows
+                    t = fc[:, :, j]
+
+                    if k == 1:
+                        # Skip the first and last bins in reduced form
+                        if reducedform and (freq_idx == 1 or freq_idx == nfreqs - 2):
+                            continue
+
+                        mfbin_ptr -= 1
+                        freq_idx = mfbin_ptr
+
+                        t = torch.concatenate(
+                            (
+                                t[:, :, :1],
+                                torch.flip(t[:, :, 1:], dims=(2,))
+                            ),
+                            dim=2,
+                        ).conj()
+
+                        # need new params corresponding to adjusted freq_idx
+                        wr1, wr2, Lg = loopparams[freq_idx]
+
+                    r = (Lg + 1) // 2
+                    l = Lg // 2
+
+                    t1 = temp0[:, :, :r]
+                    t2 = temp0[:, :, Lg - l : Lg]
+
+                    t1[:, :, :] = t[:, :, :r]
+                    t2[:, :, :] = t[:, :, Lg - l : Lg]
+
+                    temp0[:, :, :Lg] *= gdiis[freq_idx, :Lg]
+                    temp0[:, :, :Lg] *= Lg
+
+                    fr[:, :, wr1] += t2
+                    fr[:, :, wr2] += t1
+
             fbin_ptr += nb_fbins
 
     ftr = fr[:, :, :nn//2+1] if real else fr

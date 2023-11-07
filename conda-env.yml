@@ -6,13 +6,12 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.9
+  - python>=3.9
   - numpy
   - numba
   - scipy
-  - pytorch==1.9
+  - pytorch>=2.0
   - torchaudio
-  - cudatoolkit=11
   - tqdm
   - libsndfile
   - ffmpeg
